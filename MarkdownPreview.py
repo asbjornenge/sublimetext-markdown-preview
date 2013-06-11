@@ -51,6 +51,31 @@ class MarkdownCheatsheetCommand(sublime_plugin.TextCommand):
 class MarkdownPreviewCommand(sublime_plugin.TextCommand):
     ''' preview file contents with python-markdown and your web browser '''
 
+    def getTopHtml(self):
+        ''' Top HTML - just a tiny menu '''
+        return """
+            <ul class="topmenu">
+                <li>TOC</li>
+                <li>Markup</li>
+            </ul>
+        """
+
+    def getBottomScript(self):
+        ''' Bottom script '''
+        return """
+            <script type="text/javascript">
+                var menu = document.getElementsByClassName('topmenu');
+                menu[0].children[0].onclick = function() { 
+                    document.getElementsByClassName('toc')[0].style.display = "block";
+                    document.getElementsByClassName('markup')[0].style.display = "none";
+                }
+                menu[0].children[1].onclick = function() { 
+                    document.getElementsByClassName('toc')[0].style.display = "none";
+                    document.getElementsByClassName('markup')[0].style.display = "block";
+                }
+            </script>
+        """
+
     def getCSS(self):
         ''' return the correct CSS file based on parser and settings '''
         config_parser = settings.get('parser')
@@ -72,6 +97,31 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
                     sublime.error_message('markdown.css file not found!')
                     raise Exception("markdown.css file not found!")
             styles += u"<style>%s</style>" % open(css_path, 'r').read().decode('utf-8')
+
+        styles += """
+            <style>
+                .topmenu {
+                    display : block;
+                    margin : auto;
+                    width : 204px;
+                }
+                .topmenu li {
+                    list-style : none;
+                    float : left;
+                    text-align : center;
+                    width : 100px;
+                    border : 1px solid #ccc;
+                    cursor : pointer;
+                }
+                .toc {
+                    display : none;
+                    margin-top : 30px;
+                }
+                .markup {
+                    margin-top : 30px;
+                }
+            </style>
+        """
 
         if settings.get('allow_css_overrides'):
             filename = self.view.file_name()
@@ -158,6 +208,7 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
         github_oauth_token = settings.get('github_oauth_token')
 
         markdown_html = u'cannot convert markdown'
+        toc_html = u'TOC not available'
         if config_parser and config_parser == 'github':
             # use the github API
             sublime.status_message('converting markdown with github API...')
@@ -203,7 +254,7 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
             # postprocess the html from internal parser
             markdown_html = self.postprocessor(markdown_html)
 
-        return markdown_html
+        return {'md' : markdown_html, 'toc' : toc_html }
 
     def run(self, edit, target='browser'):
         region = sublime.Region(0, self.view.size())
@@ -218,7 +269,14 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
         full_html += self.getHighlight()
         full_html += self.getMathJax()
         full_html += '</head><body>'
-        full_html += markdown_html
+        full_html += self.getTopHtml()
+        full_html += '<div class="toc">'
+        full_html += markdown_html['toc']
+        full_html += '</div>'
+        full_html += '<div class="markup">'
+        full_html += markdown_html['md']
+        full_html += '</div>'
+        full_html += self.getBottomScript()
         full_html += '</body>'
         full_html += '</html>'
 
